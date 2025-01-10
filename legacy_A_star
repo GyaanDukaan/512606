@@ -1,0 +1,135 @@
+#include <iostream>
+#include <vector>
+#include <queue>
+#include <set>
+#include <cmath>
+#include <limits>
+#include <map>
+
+struct Node {
+    int x, y;
+    double g, h; // g: cost from start, h: heuristic cost to goal
+    Node* parent;
+
+    Node() 
+    {
+        x = y = 0;
+        g = h = 0.0;
+    }
+    Node(int x, int y, double g = 0, double h = 0, Node* parent = nullptr)
+        : x(x), y(y), g(g), h(h), parent(parent) {}
+
+    double f() const { return g + h; }
+
+    bool operator<(const Node& other) const { return f() > other.f(); }
+};
+
+class AStar {
+public:
+    AStar(const std::vector<std::vector<int>>& grid)
+        : grid(grid), rows(grid.size()), cols(grid[0].size()) {}
+
+    std::vector<Node> search(const Node& start, const Node& goal) {
+        std::priority_queue<Node> openSet;
+        std::set<std::pair<int, int>> closedSet;
+
+        openSet.emplace(start);
+
+        while (!openSet.empty()) {
+            Node current = openSet.top();
+            openSet.pop();
+
+            if (current.x == goal.x && current.y == goal.y) {
+                return reconstructPath(current);
+            }
+
+            closedSet.insert({ current.x, current.y });
+
+            for (auto& neighbor : getNeighbors(current)) {
+                if (closedSet.find({ neighbor.x, neighbor.y }) != closedSet.end()) {
+                    continue;
+                }
+
+                double tentative_g = current.g + distance(current, neighbor);
+
+                // Check if the node is already in the open set with a better g-score
+                if (auto it = nodeMap.find({ neighbor.x, neighbor.y });
+                    it == nodeMap.end() || tentative_g < it->second.g) {
+                    neighbor.g = tentative_g;
+                    neighbor.h = distance(neighbor, goal);
+                    neighbor.parent = new Node(current); // Memory intensive
+
+                    openSet.emplace(neighbor);
+                    nodeMap[{neighbor.x, neighbor.y}] = neighbor;
+                }
+            }
+        }
+
+        return {}; // Return empty path if no solution found
+    }
+
+private:
+    std::vector<std::vector<int>> grid;
+    size_t rows, cols;
+    std::map<std::pair<int, int>, Node> nodeMap;
+
+    double distance(const Node& a, const Node& b) {
+        return std::sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+    }
+
+    std::vector<Node> reconstructPath(const Node& current) {
+        std::vector<Node> path;
+        const Node* node = &current;
+        while (node) {
+            path.push_back(*node);
+            node = node->parent;
+        }
+        std::reverse(path.begin(), path.end());
+        return path;
+    }
+
+    std::vector<Node> getNeighbors(const Node& current) {
+        std::vector<Node> neighbors;
+        const std::vector<std::pair<int, int>> directions = {
+            {0, 1}, {1, 0}, {0, -1}, {-1, 0} };
+
+        for (const auto& dir : directions) {
+            int nx = current.x + dir.first;
+            int ny = current.y + dir.second;
+
+            if (nx >= 0 && nx < rows && ny >= 0 && ny < cols && grid[nx][ny] == 0) {
+                neighbors.emplace_back(nx, ny);
+            }
+        }
+
+        return neighbors;
+    }
+};
+
+int main() {
+    std::vector<std::vector<int>> grid = {
+        {0, 1, 0, 0, 0},
+        {0, 1, 0, 1, 0},
+        {0, 0, 0, 1, 0},
+        {0, 1, 0, 0, 0},
+        {0, 0, 0, 1, 0},
+    };
+
+    AStar astar(grid);
+    Node start(0, 0);
+    Node goal(4, 4);
+
+    std::vector<Node> path = astar.search(start, goal);
+
+    if (!path.empty()) {
+        std::cout << "Path found:\n";
+        for (const auto& node : path) {
+            std::cout << "(" << node.x << ", " << node.y << ") ";
+        }
+    }
+    else {
+        std::cout << "No path found!";
+    }
+
+    return 0;
+}
